@@ -31,7 +31,7 @@ import cz.msebera.android.httpclient.Header;
 public class FragmentList extends Fragment{
 
     View frag;
-    String url = "https://numero-logy-app.org.in/getMessages";
+    String url = "https://dev-marinov.ru/server/involtaServer/involtalist.php";
     RecyclerView recyclerView;
     AdapterList adapterList;
     ArrayList<ObjectMessage> arrayList;
@@ -43,6 +43,10 @@ public class FragmentList extends Fragment{
     int z = 0; // переменная для увеличения значения для метода getData
     int numForTry; // временная переменная для копии увеличенного значения для метода getData
 
+    TextView tvVisibleRangeBefore, tvVisibleRangeAfter, tvAdd, tvTotalVisibleElementsStart,
+            tvTotalVisibleElementsEnd, tvTotalElements;
+    int count = 0;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -52,12 +56,35 @@ public class FragmentList extends Fragment{
         arrayList = new ArrayList<>(); // массив для записи сообщений
         handler = new Handler(Looper.getMainLooper()); // handler для главного потока
 
+        tvVisibleRangeBefore = frag.findViewById(R.id.tvVisibleRangeBefore);
+        tvVisibleRangeAfter = frag.findViewById(R.id.tvVisibleRangeAfter);
+        tvAdd = frag.findViewById(R.id.tvAdd);
+        tvTotalVisibleElementsStart = frag.findViewById(R.id.tvTotalVisibleElementsStart);
+        tvTotalVisibleElementsEnd = frag.findViewById(R.id.tvTotalVisibleElementsEnd);
+
+
         progressBar = frag.findViewById(R.id.progressBar);
         progressBarCheckNet = frag.findViewById(R.id.progressBarCheckNet);
         recyclerView = frag.findViewById(R.id.recyclerView);
         btTryAgain = frag.findViewById(R.id.btTryAgain);
         tvInfo = frag.findViewById(R.id.tvInfo);
         cardView = frag.findViewById(R.id.cardView);
+
+        // передача данных счета для пользователя
+        ((MainActivity)getActivity()).setInterfaceNums(new MainActivity.InterfaceNums() {
+            @Override
+            public void methodInterfaceNums(int first, int last) {
+                tvVisibleRangeBefore.setText("" + first);
+                tvVisibleRangeAfter.setText("" + last);
+
+                tvTotalVisibleElementsStart.setText("0");
+                if(last > count)
+                {
+                    count = last;
+                    tvTotalVisibleElementsEnd.setText("" + count);
+                }
+            }
+        });
 
         getData(0); // сетевой запрос на полуение данных
 
@@ -73,6 +100,7 @@ public class FragmentList extends Fragment{
         adapterList.setOnLoadMoreListener(new AdapterList.OnLoadMoreListener() {
             @Override
             public void onLoadMore() {
+                Log.e("3333","-зашел в setOnLoadMoreListener-");
                 // сначала должен появиться Progress bar show
                 //hashMap.put(hashMap.size()+1, null);
                 arrayList.add(null); // с помощью null мы добавляем progressBar
@@ -91,6 +119,7 @@ public class FragmentList extends Fragment{
                         //getData(hashMap.size() + 1);/// + 20;
                         z = z + 20; // переменная для увеличения значения offset
                         getData(z);/// + 20;
+                        Log.e("3333","-зашел в setOnLoadMoreListener добавил + 20-");
                     }
                 },100);
             }
@@ -101,7 +130,9 @@ public class FragmentList extends Fragment{
 
     public void getData(int num) // сетевой запрос на полуение данных
     {
-        checkNetworkMethod(); // проверяем наличие интернета при каждом сетевом запросе
+        // проверяем наличие интернета при каждом сетевом запросе
+        if(checkNetworkMethod())
+        {
 
         numForTry = num;
         AsyncHttpClient asyncHttpClient = new AsyncHttpClient();
@@ -111,7 +142,7 @@ public class FragmentList extends Fragment{
         asyncHttpClient.get(url, requestParams, new TextHttpResponseHandler() {
             @Override
             public void onFailure(int statusCode, Header[] headers, String responseString, Throwable throwable) {
-                Log.e("333","-onFailure-");
+               // Log.e("333", "onFailure" + responseString);
 
                 getActivity().runOnUiThread(new Runnable() {
                     @Override
@@ -120,17 +151,10 @@ public class FragmentList extends Fragment{
                         tvInfo.setText("ошибка работы сервера (onFailure)");
                     }
                 });
-                btTryAgain.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        buttonClick();
-                    }
-                });
-
             }
             @Override
             public void onSuccess(int statusCode, Header[] headers, String responseString) {
-                Log.e("333","-onSuccess-responseString-" + responseString);
+                //Log.e("333","-onSuccess-responseString-" + responseString);
 
                 JSONObject jsonObject = null;
                 try {
@@ -143,9 +167,14 @@ public class FragmentList extends Fragment{
                         for (int i = 0; i < jsonArray.length(); i++) {
                             String messageStr = jsonArray.getString(i);
                             arrayList.add(new ObjectMessage(messageStr));
+                            Log.e("333fr", "arrayList " + arrayList.get(i).message.toString());
                         }
+                         Log.e("333fr", "arrayList.size" + arrayList.size());
                         adapterList.notifyDataSetChanged(); // обновили все данные в recyclerview
                         adapterList.setLoading(); // присваиваем flagLoading = false в методе setLoading()
+
+                        // 3
+                        tvAdd.setText("+ " + arrayList.size());
                     }
 
                 } catch (JSONException e) {
@@ -154,7 +183,9 @@ public class FragmentList extends Fragment{
                         @Override
                         public void run() {
                             cardView.setVisibility(View.VISIBLE); // показать view с сообщением пользователю
-                            tvInfo.setText("ошибка работы сервера");
+                            tvInfo.setText("ошибка работы сервера Exception");
+
+                            //tvInfo.animate().rotation(90).start();
                         }
                     });
                     btTryAgain.setOnClickListener(new View.OnClickListener() {
@@ -166,15 +197,18 @@ public class FragmentList extends Fragment{
                 }
             }
         });
+
+        }
     }
 
-    public void checkNetworkMethod() // метод проверки наличия интернета при каждом сетевом запросе
+    public boolean checkNetworkMethod() // метод проверки наличия интернета при каждом сетевом запросе
     {
         // проверка интернера при отправке запроса на сервер
         if (CheckNetwork.isInternetAvailable(getContext())) //возвращает true, если интернет доступен
         {
             cardView.setVisibility(View.GONE);  // скрыть view с сообщением пользователю
             tvInfo.setText("");
+            return true;
 
         } else { // возвращает false, если интернет недоступен
             getActivity().runOnUiThread(new Runnable() { // в главном потоке
@@ -190,6 +224,7 @@ public class FragmentList extends Fragment{
                     });
                 }
             });
+            return false;
         }
     }
 
@@ -200,16 +235,24 @@ public class FragmentList extends Fragment{
             @Override
             public void run() {
                 progressBarCheckNet.setVisibility(View.VISIBLE); // запуск PG на 0,5сек
-                cardView.setVisibility(View.GONE); // скрыть cardView с кн.повторной попытки
             }
         });
 
         Runnable runnable = new Runnable() { // главный поток
             @Override
             public void run() {
+                //getData(numForTry); // сделать сетевой запрос с текущим num
                 progressBarCheckNet.setVisibility(View.GONE); // скрыть PG
-                getData(numForTry); // сделать сетевой запрос с текущим num
                 tvInfo.setText("");
+                cardView.setVisibility(View.GONE); // скрыть cardView с кн.повторной попытки
+
+                Runnable runnable1 = new Runnable() {
+                    @Override
+                    public void run() {
+                        getData(numForTry);
+                    }
+                };
+                handler.postDelayed(runnable1, 3000);
             }
         };
         handler.postDelayed(runnable, 500); // задержка

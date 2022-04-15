@@ -20,9 +20,9 @@ import android.os.Bundle;
 import android.view.WindowManager;
 import android.widget.Button;
 
-
 public class MainActivity extends AppCompatActivity {
 
+    static InterfaceNums interfaceNums;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,5 +78,15 @@ public class MainActivity extends AppCompatActivity {
         fragmentTransaction.replace(R.id.llFragList, fragmentList, "llFragList");
         //fragmentTransaction.addToBackStack("llFragList");
         fragmentTransaction.commit();
+    }
+
+    // интерфейс для передачи данных из адаптера
+    interface InterfaceNums
+    {
+        void methodInterfaceNums(int first, int last);
+    }
+    public void setInterfaceNums(InterfaceNums interfaceNums)
+    {
+        this.interfaceNums = interfaceNums;
     }
 }
